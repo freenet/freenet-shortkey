@@ -12,4 +12,5 @@ path = "src/main.rs"
 freenet-shortkey-common.workspace = true
 ed25519-dalek = { workspace = true, features = ["rand_core"] }
 bs58.workspace = true
+blake3.workspace = true
 freenet-stdlib = { version = "0.12.1" }

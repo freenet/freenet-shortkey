@@ -9,6 +9,8 @@ freenet-stdlib.workspace = true
 freenet-shortkey-common.workspace = true
 
 [dev-dependencies]
+blake3.workspace = true
+curve25519-dalek.workspace = true
 ed25519-dalek = { workspace = true, features = ["rand_core"] }
 rand = "0.8.5"
 
