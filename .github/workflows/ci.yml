@@ -10,9 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # rust-toolchain.toml pins rustc and the wasm32 target; rustup installs them on first use.
+      # rust-toolchain.toml pins rustc, components and the wasm32 target.
       - name: Install pinned toolchain
-        run: rustup show
+        run: |
+          rustup toolchain install
+          rustc -vV
       - run: cargo fmt --all -- --check
       - run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - run: cargo test --locked --workspace
@@ -22,7 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install pinned toolchain
-        run: rustup show
+        run: |
+          rustup toolchain install
+          rustc -vV
       - name: Rebuild WASM and compare with the committed artifact
         run: |
           cp wasm/freenet_shortkey_v1.wasm /tmp/committed.wasm
@@ -32,3 +36,21 @@ jobs:
             echo "Changing it changes every resolver address. Make a new generation instead." >&2
             exit 1
           fi
+
+  # The WASM embeds dependency source paths; a verifier whose CARGO_HOME differs from ours
+  # (e.g. the `rust` Docker image: /usr/local/cargo) must still get identical bytes.
+  wasm-frozen-other-cargo-home:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned toolchain
+        run: |
+          rustup toolchain install
+          rustc -vV
+      - name: Rebuild with a different CARGO_HOME and compare
+        run: |
+          cp wasm/freenet_shortkey_v1.wasm /tmp/committed.wasm
+          export CARGO_HOME="$RUNNER_TEMP/alt-cargo-home"
+          mkdir -p "$CARGO_HOME"
+          ./scripts/build-wasm.sh
+          cmp wasm/freenet_shortkey_v1.wasm /tmp/committed.wasm
