@@ -14,3 +14,9 @@ rand = "0.8.5"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[features]
+# The #[contract] macro gates its WASM exports on these feature names in THIS crate.
+default = ["freenet-main-contract"]
+freenet-main-contract = []
+contract = ["freenet-stdlib/contract"]
