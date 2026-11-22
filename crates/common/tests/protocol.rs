@@ -317,5 +317,6 @@ fn signature_is_bound_to_short_id() {
         vk: vk(&k),
         signed: Some(s1),
     };
-    assert!(st.verify(&id2).is_err());
+    // rejected at the key binding; the signature check itself is covered in src/tests.rs
+    assert_eq!(st.verify(&id2), Err(Error::BindingMismatch));
 }
