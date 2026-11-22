@@ -130,7 +130,9 @@ pub fn parse_locator(s: &str) -> Result<Locator, Error> {
             }
             Ok(Locator::Full(k))
         }
-        n => Err(Error::BadHandle(format!("decodes to {n} bytes, expected 16 or 32"))),
+        n => Err(Error::BadHandle(format!(
+            "decodes to {n} bytes, expected 16 or 32"
+        ))),
     }
 }
 
@@ -170,7 +172,12 @@ impl SignedData {
         }
         let id = ShortId::derive(key.verifying_key().as_bytes());
         let sig = key.sign(&Self::message(&id, revision, format, &data));
-        Ok(SignedData { revision, format, data, signature: sig.to_bytes() })
+        Ok(SignedData {
+            revision,
+            format,
+            data,
+            signature: sig.to_bytes(),
+        })
     }
 
     fn verify(&self, vk: &VerifyingKey, id: &ShortId) -> Result<(), Error> {
@@ -178,8 +185,11 @@ impl SignedData {
             return Err(Error::DataTooLarge(self.data.len()));
         }
         let sig = Signature::from_bytes(&self.signature);
-        vk.verify_strict(&Self::message(id, self.revision, self.format, &self.data), &sig)
-            .map_err(|_| Error::BadSignature)
+        vk.verify_strict(
+            &Self::message(id, self.revision, self.format, &self.data),
+            &sig,
+        )
+        .map_err(|_| Error::BadSignature)
     }
 
     /// Total order used by merge: the greater value wins. Higher revision wins; at equal
@@ -246,7 +256,12 @@ impl ResolverState {
                 }
                 let data = r.take(len)?.to_vec();
                 let signature = r.array::<SIG_LEN>()?;
-                Some(SignedData { revision, format, data, signature })
+                Some(SignedData {
+                    revision,
+                    format,
+                    data,
+                    signature,
+                })
             }
             _ => return Err(Error::Malformed("bad data flag")),
         };
@@ -292,7 +307,10 @@ impl ResolverState {
 
     pub fn summary(&self) -> Summary {
         Summary {
-            head: self.signed.as_ref().map(|s| (s.revision, *blake3::hash(&s.signature).as_bytes())),
+            head: self
+                .signed
+                .as_ref()
+                .map(|s| (s.revision, *blake3::hash(&s.signature).as_bytes())),
         }
     }
 

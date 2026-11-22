@@ -26,9 +26,21 @@ fn merged(a: &ResolverState, b: &ResolverState) -> ResolverState {
 #[test]
 fn derivation_vectors() {
     let cases: [([u8; 32], &str, &str); 3] = [
-        ([0u8; 32], "65602aff592963c36beeaa812aa12b83", "DX4ZCXQ4NZgiw1Cuh8YjuC"),
-        ([1u8; 32], "8c35f5bdd1081c19e80c6e1e3af9817d", "JKCi2BXwJLh46QKm3Sf46p"),
-        ([0xffu8; 32], "562bd5927a6025d29a6f5cdd4eaefc17", "BeAcviiYQKaBSC15JkK1TL"),
+        (
+            [0u8; 32],
+            "65602aff592963c36beeaa812aa12b83",
+            "DX4ZCXQ4NZgiw1Cuh8YjuC",
+        ),
+        (
+            [1u8; 32],
+            "8c35f5bdd1081c19e80c6e1e3af9817d",
+            "JKCi2BXwJLh46QKm3Sf46p",
+        ),
+        (
+            [0xffu8; 32],
+            "562bd5927a6025d29a6f5cdd4eaefc17",
+            "BeAcviiYQKaBSC15JkK1TL",
+        ),
     ];
     for (k, hex, b58) in cases {
         let id = ShortId::derive(&k);
@@ -65,7 +77,10 @@ fn locator_told_apart_by_length() {
     let k = vk(&key(3));
     let id = ShortId::derive(&k);
     assert_eq!(parse_locator(&id.to_base58()).unwrap(), Locator::Short(id));
-    assert_eq!(parse_locator(&bs58::encode(k).into_string()).unwrap(), Locator::Full(k));
+    assert_eq!(
+        parse_locator(&bs58::encode(k).into_string()).unwrap(),
+        Locator::Full(k)
+    );
     assert!(parse_locator(&bs58::encode([1u8; 24]).into_string()).is_err());
     assert!(parse_locator("not base58 !!").is_err());
 }
@@ -137,7 +152,10 @@ fn size_limits() {
     bytes.extend_from_slice(&1u64.to_be_bytes());
     bytes.extend_from_slice(&1u16.to_be_bytes());
     bytes.extend_from_slice(&u32::MAX.to_be_bytes());
-    assert!(matches!(ResolverState::decode(&bytes), Err(Error::DataTooLarge(_))));
+    assert!(matches!(
+        ResolverState::decode(&bytes),
+        Err(Error::DataTooLarge(_))
+    ));
 }
 
 #[test]
@@ -203,7 +221,10 @@ fn minimal_reconstruction_never_erases_data() {
 #[test]
 fn merge_rejects_different_keys() {
     let mut a = ResolverState::minimal(vk(&key(1)));
-    assert_eq!(a.merge(&ResolverState::minimal(vk(&key(2)))), Err(Error::KeyMismatch));
+    assert_eq!(
+        a.merge(&ResolverState::minimal(vk(&key(2)))),
+        Err(Error::KeyMismatch)
+    );
 }
 
 /// Fork test: generate a pool of valid states, then merge random subsets in random orders
@@ -292,6 +313,9 @@ fn signature_is_bound_to_short_id() {
     let k = key(1);
     let s1 = SignedData::sign(&k, 1, 1, b"x".to_vec()).unwrap();
     let id2 = ShortId::derive(&vk(&key(2)));
-    let st = ResolverState { vk: vk(&k), signed: Some(s1) };
+    let st = ResolverState {
+        vk: vk(&k),
+        signed: Some(s1),
+    };
     assert!(st.verify(&id2).is_err());
 }

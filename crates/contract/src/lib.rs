@@ -9,7 +9,9 @@ use freenet_stdlib::prelude::*;
 pub struct ShortKeyContract;
 
 fn err<E: std::fmt::Display>(e: E) -> ContractError {
-    ContractError::InvalidUpdateWithInfo { reason: e.to_string() }
+    ContractError::InvalidUpdateWithInfo {
+        reason: e.to_string(),
+    }
 }
 
 /// Parse and fully verify a state (or delta, which has the state encoding) against `id`.
@@ -71,7 +73,10 @@ impl ContractInterface for ShortKeyContract {
     ) -> Result<StateDelta<'static>, ContractError> {
         let id = ShortId::from_params(parameters.as_ref()).map_err(err)?;
         let s = parse_verified(state.as_ref(), &id)?;
-        let peer = Summary::decode(summary.as_ref()).map_err(|e| ContractError::Deser(e.to_string()))?;
-        Ok(StateDelta::from(s.delta_for(&peer).map(|d| d.encode()).unwrap_or_default()))
+        let peer =
+            Summary::decode(summary.as_ref()).map_err(|e| ContractError::Deser(e.to_string()))?;
+        Ok(StateDelta::from(
+            s.delta_for(&peer).map(|d| d.encode()).unwrap_or_default(),
+        ))
     }
 }

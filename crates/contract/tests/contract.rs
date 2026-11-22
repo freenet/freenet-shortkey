@@ -45,7 +45,12 @@ fn validate_binding_and_signature() {
     // wrong params, short params, empty state, tampered data
     assert!(!validate(params(&minimal(&key(2))), &m));
     assert!(!validate(Parameters::from(vec![0u8; 15]), &m));
-    assert!(ShortKeyContract::validate_state(params(&m), State::from(vec![]), RelatedContracts::default()).is_err());
+    assert!(ShortKeyContract::validate_state(
+        params(&m),
+        State::from(vec![]),
+        RelatedContracts::default()
+    )
+    .is_err());
     let mut t = full(&k, 1, b"x");
     t.signed.as_mut().unwrap().data = b"y".to_vec();
     assert!(!validate(params(&m), &t));
@@ -62,7 +67,10 @@ fn update_merges_and_never_erases() {
     assert_eq!(update(p.clone(), &r2, vec![st(&r1)]).unwrap(), r2);
     assert_eq!(update(p.clone(), &r2, vec![st(&minimal(&k))]).unwrap(), r2);
     assert_eq!(update(p.clone(), &r2, vec![st(&r2), st(&r2)]).unwrap(), r2);
-    assert_eq!(update(p.clone(), &minimal(&k), vec![st(&r2), st(&r1)]).unwrap(), r2);
+    assert_eq!(
+        update(p.clone(), &minimal(&k), vec![st(&r2), st(&r1)]).unwrap(),
+        r2
+    );
     // empty delta is skipped
     let empty = UpdateData::Delta(StateDelta::from(vec![]));
     assert_eq!(update(p, &r1, vec![empty]).unwrap(), r1);
@@ -99,7 +107,8 @@ fn summary_delta_roundtrip() {
     let m = minimal(&k);
     let r = full(&k, 3, b"data");
     let sum_m = ShortKeyContract::summarize_state(p.clone(), State::from(m.encode())).unwrap();
-    let delta = ShortKeyContract::get_state_delta(p.clone(), State::from(r.encode()), sum_m).unwrap();
+    let delta =
+        ShortKeyContract::get_state_delta(p.clone(), State::from(r.encode()), sum_m).unwrap();
     assert!(!delta.as_ref().is_empty());
     let got = update(p.clone(), &m, vec![UpdateData::Delta(delta)]).unwrap();
     assert_eq!(got, r);

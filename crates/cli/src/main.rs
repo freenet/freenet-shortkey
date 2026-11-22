@@ -60,13 +60,18 @@ fn main() {
             println!("handle {}", st.short_id());
         }
         "sign-state" => {
-            let sk: [u8; 32] = decode_hex(s(1)).try_into().unwrap_or_else(|_| die("sk must be 32 bytes hex"));
+            let sk: [u8; 32] = decode_hex(s(1))
+                .try_into()
+                .unwrap_or_else(|_| die("sk must be 32 bytes hex"));
             let key = SigningKey::from_bytes(&sk);
             let rev: u64 = s(2).parse().unwrap_or_else(|_| die("bad revision"));
             let fmt: u16 = s(3).parse().unwrap_or_else(|_| die("bad format"));
             let data = std::fs::read(s(4)).unwrap_or_else(|e| die(e));
             let signed = SignedData::sign(&key, rev, fmt, data).unwrap_or_else(|e| die(e));
-            let st = ResolverState { vk: *key.verifying_key().as_bytes(), signed: Some(signed) };
+            let st = ResolverState {
+                vk: *key.verifying_key().as_bytes(),
+                signed: Some(signed),
+            };
             std::fs::write(s(5), st.encode()).unwrap_or_else(|e| die(e));
             println!("handle {} revision {rev}", st.short_id());
         }
@@ -94,7 +99,7 @@ fn main() {
 }
 
 fn decode_hex(h: &str) -> Vec<u8> {
-    if h.len() % 2 != 0 {
+    if !h.len().is_multiple_of(2) {
         die("odd-length hex");
     }
     (0..h.len())
