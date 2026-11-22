@@ -63,16 +63,18 @@ Test vectors (pinned in `crates/common/tests/protocol.rs`):
 
 ## Collision analysis
 
-The id is 128 bits of a hash. Finding two keys with the same id (a birthday collision) costs
-about 2^64 key generations and hashes, which is a large but not infeasible attack for a
-well-funded adversary; a targeted second-preimage against a chosen victim key costs about
-2^128. The attack that matters is the first: an attacker who grinds two keys with one id can
-present one to different audiences. Mitigations: the resolver address is first-come per id
-and contents are verified against the full key, so a collision does not let anyone overwrite
-an existing owner's key (the state's `vk` must hash to the id, and the colliding key hashes to
-the same id, so a collision pair is the residual risk). Applications that need more than
-64-bit collision resistance should use the full key for trust decisions and treat the handle
-as a locator. Clients must always verify that the resolved key hashes back to the handle.
+The id is 128 bits of a hash. Two risks differ by cost:
+
+- Targeted second preimage (an attacker wants a key that maps to a victim's handle): about
+  2^128 work. Infeasible.
+- Birthday collision (an attacker grinds two keys that share a handle): about 2^64 work.
+  Large, but within reach of a well-funded adversary. The attacker holds both keys, so this
+  lets them show different people different owners for one handle, but it cannot take over
+  a handle that someone else already derived from their own key.
+
+Clients must always check that the resolved key hashes back to the handle, and applications
+that need more than 64-bit collision resistance should use the full key for trust decisions
+and treat the handle as a locator.
 
 ## WASM stability
 
@@ -84,7 +86,13 @@ A new WASM is a new GENERATION (`v2`, a new derive domain if the derivation chan
 published artifact under `wasm/`), with the old generation kept resolvable. Never overwrite
 `wasm/freenet_shortkey_v1.wasm`.
 
-Generation 1 code hash (BLAKE3 of `wasm/freenet_shortkey_v1.wasm`): see the section below.
+Generation 1 (`wasm/freenet_shortkey_v1.wasm`, rustc 1.94.1, freenet-stdlib 0.12.1):
+
+- BLAKE3 of the WASM file (hex): `d91febf086144e0b658425347dba8cdbe9ef64195ffdc647f31f799cb75ab42e`
+- Freenet code hash as the CLI prints it (base58): `FcZhimwyj3Qv4vj2WMk5NcSnhZaDT2Ktq5cgq1gU8r1b`
+- Example: handle `DX4ZCXQ4NZgiw1Cuh8YjuC` resolves at contract id `DkYYsFjfWNf5SP3BqRYXJymccmB2wDPp38j6RYmwVEn`.
+
+Not yet verified: that the build is byte-identical from a different checkout path or machine.
 
 ## Layout and commands
 
