@@ -133,6 +133,37 @@ a different `CARGO_HOME` and comparing (identical bytes); CI repeats this under 
 `CARGO_HOME` (`wasm-frozen-other-cargo-home`). Formatting shifts panic line numbers baked into
 the WASM, so run `cargo fmt` before building; CI checks both.
 
+## Testing
+
+```
+cargo test --locked                 # 12 + 17 unit/protocol tests (common), 10 contract tests
+```
+
+Native tests call the contract as a Rust library, so the committed WASM was also run as WASM
+(2026-11-22) on a real local node: `freenet local --ws-api-port 17531` (freenet 0.2.162, private
+data dir, `--disable-auto-update`) driven with `fdev 0.3.295 -p 17531 execute ...`, using
+`wasm/freenet_shortkey_v1.wasm` (BLAKE3 `7fd0f944...04c5`) and states made by the CLI for the key
+`SigningKey([1; 32])` (handle `SuTtS5xX1UrqpMXjwEzCC2`, contract id
+`6eoC9xFsag1ZoFEM2SAV2rY5RzXKLhqrdt6zK4i2m6TU`, which equals `contract-key` output):
+
+| step | result |
+|---|---|
+| `put --parameters params.bin contract --state min.bin` | published at the predicted id |
+| `get` | 34 bytes, identical to `min.bin` |
+| `update --as-state r1.bin` (revision 1, signed) | accepted; `get` returns `r1.bin` byte for byte |
+| `update r2.bin` (revision 2, as a delta) | accepted; `get` returns `r2.bin` |
+| stale `update --as-state r1.bin` | accepted, state stays `r2.bin` (no regression) |
+| `update` with another key's state | rejected: `key does not hash to the short id` |
+| `update` with a flipped data byte | rejected: `data signature does not verify` |
+| `update` with delta `junk` | rejected: `malformed encoding: unknown version`; state still `r2.bin` |
+| `put` key 1's state under key 2's parameters | rejected: `key does not hash to the short id` |
+| `put` key 2's minimal state under key 2's parameters | published |
+
+This exercises validate, update (state and delta), summarize and get-delta (the node calls
+them during update) and the error paths under `panic=abort`. The `StateAndDelta`, `Related*`
+and empty-summary paths are only reachable from the library tests, because the node flattens
+`StateAndDelta` before the WASM sees it and `fdev` cannot send the others.
+
 ## Layout and commands
 
 - `crates/common`: types, derivation, encoding, verification, merge (uses `std`; not `no_std`).
