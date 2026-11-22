@@ -1,0 +1,16 @@
+[package]
+name = "freenet-shortkey-contract"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+freenet-stdlib.workspace = true
+freenet-shortkey-common.workspace = true
+
+[dev-dependencies]
+ed25519-dalek = { workspace = true, features = ["rand_core"] }
+rand = "0.8.5"
+
+[lib]
+crate-type = ["cdylib", "rlib"]

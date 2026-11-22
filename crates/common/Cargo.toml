@@ -1,0 +1,15 @@
+[package]
+name = "freenet-shortkey-common"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Types, derivation, encoding, verification and merge for the Freenet short-key resolver"
+
+[dependencies]
+blake3.workspace = true
+ed25519-dalek.workspace = true
+bs58.workspace = true
+
+[dev-dependencies]
+ed25519-dalek = { workspace = true, features = ["rand_core"] }
+rand = "0.8.5"

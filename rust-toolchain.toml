@@ -1,0 +1,6 @@
+[toolchain]
+# Pinned: the WASM bytes (and so every resolver address) depend on the rustc version.
+# Changing this is a new resolver generation, not routine maintenance. See README.
+channel = "1.94.1"
+components = ["rustfmt", "clippy"]
+targets = ["wasm32-unknown-unknown"]

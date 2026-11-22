@@ -1,0 +1,36 @@
+[workspace]
+members = ["crates/common", "crates/contract", "crates/cli"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+
+[workspace.dependencies]
+blake3 = { version = "1.5.3", default-features = false }
+ed25519-dalek = { version = "2.1.1", default-features = false, features = ["alloc"] }
+bs58 = "0.5.1"
+freenet-stdlib = { version = "0.12.1", features = ["contract"] }
+freenet-shortkey-common = { path = "crates/common" }
+
+# The contract key is BLAKE3(BLAKE3(wasm) || params), so these profile settings
+# are part of the protocol: changing them changes the WASM bytes and therefore
+# every resolver address. See README "WASM stability".
+[profile.release]
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = 'abort'
+strip = true
+
+[profile.release.package."*"]
+opt-level = 'z'
+
+# Signature and hash crates optimized in debug test builds (fork tests verify many signatures).
+[profile.dev.package.curve25519-dalek]
+opt-level = 3
+[profile.dev.package.ed25519-dalek]
+opt-level = 3
+[profile.dev.package.blake3]
+opt-level = 3
