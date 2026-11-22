@@ -88,11 +88,11 @@ published artifact under `wasm/`), with the old generation kept resolvable. Neve
 
 Generation 1 (`wasm/freenet_shortkey_v1.wasm`, rustc 1.94.1, freenet-stdlib 0.12.1):
 
-- BLAKE3 of the WASM file (hex): `d91febf086144e0b658425347dba8cdbe9ef64195ffdc647f31f799cb75ab42e`
-- Freenet code hash as the CLI prints it (base58): `FcZhimwyj3Qv4vj2WMk5NcSnhZaDT2Ktq5cgq1gU8r1b`
-- Example: handle `DX4ZCXQ4NZgiw1Cuh8YjuC` resolves at contract id `DkYYsFjfWNf5SP3BqRYXJymccmB2wDPp38j6RYmwVEn`.
+- BLAKE3 of the WASM file (hex): `701b87d00748639f6e826cf887bed69fd2979cb39e7374bc79d4d4b717d56f3c`
+- Freenet code hash as the CLI prints it (base58): `8Yd1baYj1jh7ZowdAzGbYbZRSfaQAAxeHpx4HpyP42Vh`
+- Example: handle `DX4ZCXQ4NZgiw1Cuh8YjuC` resolves at contract id `CnrnEQwFWUU4PSVU3bX3yfYAtMjF5NDTHLc3phucFtHfR`.
 
-Not yet verified: that the build is byte-identical from a different checkout path or machine.
+Verified: a fresh clone at a different path rebuilt with `scripts/build-wasm.sh` produced identical bytes. Formatting shifts panic line numbers baked into the WASM, so run `cargo fmt` before building; CI checks both.
 
 ## Layout and commands
 
