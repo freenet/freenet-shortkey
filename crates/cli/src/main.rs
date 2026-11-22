@@ -13,8 +13,9 @@ const USAGE: &str = "usage:
   freenet-shortkey derive <vk-base58>                       short handle for a full key
   freenet-shortkey parse <base58>                           classify a handle or full key
   freenet-shortkey contract-key <wasm> <handle>             resolver contract key
+  freenet-shortkey hash <file>                              BLAKE3 of a file (hex)
   freenet-shortkey make-state <vk-base58> <out>             write the minimal state
-  freenet-shortkey sign-state <sk-hex> <rev> <fmt> <data-file> <out>   write a signed state
+  freenet-shortkey sign-state <sk-hex|@file> <rev> <fmt> <data-file> <out>   write a signed state
   freenet-shortkey verify <handle> <state-file>             check binding and signature
   freenet-shortkey merge <handle> <state-a> <state-b> <out> merge two states
   freenet-shortkey publish|resolve|update-data ...          print the fdev command (stub)";
@@ -26,7 +27,10 @@ fn die(msg: impl std::fmt::Display) -> ! {
 
 fn vk_arg(s: &str) -> [u8; KEY_LEN] {
     match parse_locator(s) {
-        Ok(Locator::Full(k)) => k,
+        Ok(Locator::Full(k)) => {
+            validate_key(&k).unwrap_or_else(|e| die(e));
+            k
+        }
         Ok(_) => die("expected a 32-byte public key, got a short handle"),
         Err(e) => die(e),
     }
@@ -54,13 +58,26 @@ fn main() {
             println!("code hash:    {}", code.hash());
             println!("contract id:  {}", key.id());
         }
+        "hash" => {
+            let b = std::fs::read(s(1)).unwrap_or_else(|e| die(format!("{}: {e}", s(1))));
+            println!("{}", blake3::hash(&b).to_hex());
+        }
         "make-state" => {
             let st = ResolverState::minimal(vk_arg(s(1)));
+            st.verify(&st.short_id()).unwrap_or_else(|e| die(e));
             std::fs::write(s(2), st.encode()).unwrap_or_else(|e| die(e));
             println!("handle {}", st.short_id());
         }
         "sign-state" => {
-            let sk: [u8; 32] = decode_hex(s(1))
+            // `@path` reads the hex key from a file, keeping it out of argv and shell history.
+            let sk_text = match s(1).strip_prefix('@') {
+                Some(path) => std::fs::read_to_string(path)
+                    .unwrap_or_else(|e| die(format!("{path}: {e}")))
+                    .trim()
+                    .to_string(),
+                None => s(1).to_string(),
+            };
+            let sk: [u8; 32] = decode_hex(&sk_text)
                 .try_into()
                 .unwrap_or_else(|_| die("sk must be 32 bytes hex"));
             let key = SigningKey::from_bytes(&sk);
@@ -91,16 +108,17 @@ fn main() {
         }
         "publish" | "resolve" | "update-data" => {
             println!("network call is a stub. Compute the key with `contract-key`, then use fdev:");
-            println!("  publish/update-data: fdev execute put --code <wasm> --parameters <16-byte params file> contract --state <state-file>");
-            println!("  resolve:             fdev execute get <contract-id>");
+            println!("  publish:     fdev execute put --code <wasm> --parameters <16-byte params file> contract --state <state-file>");
+            println!("  update-data: fdev execute update <contract-id> <state-file> --as-state   (existing contract)");
+            println!("  resolve:     fdev execute get <contract-id>");
         }
         _ => die(USAGE),
     }
 }
 
 fn decode_hex(h: &str) -> Vec<u8> {
-    if !h.len().is_multiple_of(2) {
-        die("odd-length hex");
+    if !h.is_ascii() || !h.len().is_multiple_of(2) || !h.bytes().all(|b| b.is_ascii_hexdigit()) {
+        die("expected an even-length string of hex digits");
     }
     (0..h.len())
         .step_by(2)
