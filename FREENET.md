@@ -11,4 +11,4 @@ with optional owner-signed versioned data. Full protocol: [README.md](README.md)
 - **Frozen WASM:** `wasm/freenet_shortkey_v1.wasm`. Changing it changes every resolver address,
   so a change is a new generation, never a rebuild. CI fails if a rebuild differs.
 
-Generation 1 code hash (base58): `8Yd1baYj1jh7ZowdAzGbYbZRSfaQAAxeHpx4HpyP42Vh` (BLAKE3 hex `701b87d00748639f6e826cf887bed69fd2979cb39e7374bc79d4d4b717d56f3c`).
+Generation 1 code hash (base58): `9bwbWefShTXmVrizwn4XQ3NdT1Zjm7rm1uWLUAwqewuW` (BLAKE3 hex `7fd0f944cb9d9cb04673288846c4434525d5d103deebcde257e290c1900d04c5`).

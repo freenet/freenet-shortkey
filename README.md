@@ -22,8 +22,10 @@ signed:  [0x01][vk:32][0x01][revision:u64][format:u16][len:u32][data:len][signat
 
 Trailing bytes, unknown versions, unknown flags and `len > 16384` are rejected.
 
-**Validation.** `vk` must be a valid, non-small-order Ed25519 point, and
-`BLAKE3(domain || vk)[..16]` must equal the parameters. The minimal mapping needs no
+**Validation.** `vk` must be the canonical 32-byte encoding of an Ed25519 point in the
+prime-order subgroup (not the identity). Non-canonical encodings (y >= p), small-order points
+and mixed-order points `A + T` are all rejected, so each real key has exactly one accepted
+form and therefore exactly one handle. `BLAKE3(domain || vk)[..16]` must equal the parameters. The minimal mapping needs no
 signature, so anyone can reconstruct it from the key. If data is present, the signature must
 verify (`verify_strict`) under `vk` over
 `"freenet-shortkey/v1/data" || short_id || revision || format || len || data`.
@@ -41,7 +43,28 @@ A delta is a full state encoding carrying the sender's data, and is empty when t
 summary shows data at least as new. At equal revision with a different digest both sides send;
 merge picks the same winner on both.
 
-**Size limit.** `data` is at most 16 KiB (`MAX_DATA_LEN`), so the whole state is under 16.5 KiB.
+**Update variants.** `update_state` merges `State`, `Delta` and both halves of `StateAndDelta`
+(an empty delta is skipped). `RelatedState`, `RelatedDelta` and `RelatedStateAndDelta` carry
+another contract's data, and `UpdateData` is `#[non_exhaustive]`, so those and any future
+variant are skipped rather than failing the batch. An empty summary is read as "the peer
+holds nothing".
+
+**Size limit.** `data` is at most 16 KiB (`MAX_DATA_LEN`), so the largest state is 16,496
+bytes (1 + 32 + 1 + 8 + 2 + 4 + 16,384 + 64).
+
+**Revisions are write-once and monotonic.** There is no rotation, tombstone, revocation or
+successor pointer: the highest revision wins and nothing can lower it. An owner may choose
+`revision = u64::MAX`, which is final (only a same-revision state with a smaller signature can
+replace it), and that choice is irreversible. This only affects the key's owner; it is kept
+because locking is the owner's decision. Use small increments. An owner can also grind
+signatures to win the equal-revision tie-break against their own states; that is harmless to
+anyone else. The owner key must only ever sign structured messages (never arbitrary
+attacker-chosen bytes), because it signs messages beginning `freenet-shortkey/v1/data`.
+
+**Golden vectors.** `crates/common/src/tests.rs` pins, for the key `SigningKey([1; 32])`,
+the exact signed message, the minimal and signed state encodings (including the Ed25519
+signature, which is deterministic) and the summary encodings as hex. Other clients (River UI,
+JS) must reproduce these bytes.
 
 ## Handle text encoding: base58
 
@@ -72,7 +95,14 @@ The id is 128 bits of a hash. Two risks differ by cost:
   lets them show different people different owners for one handle, but it cannot take over
   a handle that someone else already derived from their own key.
 
-Clients must always check that the resolved key hashes back to the handle, and applications
+**Consensus effect of a collision.** Both colliding keys produce states that pass
+`validate_state`, but `merge` returns `KeyMismatch` between them, so `update_state` fails.
+Different peers can therefore hold different keys for one address and never converge
+(summaries do not carry `vk`, so repair keeps shipping states the receiver rejects). This only
+affects the attacker's own pair of keys. The merge laws above hold per key.
+
+2^64 is the handle-uniqueness ceiling, and 128-bit handles accept it. Checking that the
+resolved key hashes back to the handle does NOT detect a deliberate collision. Applications
 that need more than 64-bit collision resistance should use the full key for trust decisions
 and treat the handle as a locator.
 
@@ -88,11 +118,20 @@ published artifact under `wasm/`), with the old generation kept resolvable. Neve
 
 Generation 1 (`wasm/freenet_shortkey_v1.wasm`, rustc 1.94.1, freenet-stdlib 0.12.1):
 
-- BLAKE3 of the WASM file (hex): `701b87d00748639f6e826cf887bed69fd2979cb39e7374bc79d4d4b717d56f3c`
-- Freenet code hash as the CLI prints it (base58): `8Yd1baYj1jh7ZowdAzGbYbZRSfaQAAxeHpx4HpyP42Vh`
-- Example: handle `DX4ZCXQ4NZgiw1Cuh8YjuC` resolves at contract id `CnrnEQwFWUU4PSVU3bX3yfYAtMjF5NDTHLc3phucFtHfR`.
+- BLAKE3 of the WASM file (hex): `7fd0f944cb9d9cb04673288846c4434525d5d103deebcde257e290c1900d04c5`
+- Freenet code hash as the CLI prints it (base58): `9bwbWefShTXmVrizwn4XQ3NdT1Zjm7rm1uWLUAwqewuW`
+- Example: handle `DX4ZCXQ4NZgiw1Cuh8YjuC` resolves at contract id `6ThwP2dPt1LNYY7p1hpmdpm6uNKrrVed6qjmYbFmU6Db`.
 
-Verified: a fresh clone at a different path rebuilt with `scripts/build-wasm.sh` produced identical bytes. Formatting shifts panic line numbers baked into the WASM, so run `cargo fmt` before building; CI checks both.
+These three values are pinned by the test `committed_wasm_hash_and_contract_id_are_pinned`
+(`crates/contract/tests/contract.rs`), which computes them from the committed file, so the
+documents cannot drift from the artifact.
+
+Reproducibility: `scripts/build-wasm.sh` remaps the configured `CARGO_HOME`, `RUSTUP_HOME`
+and the workspace path, so the bytes do not depend on where Rust is installed or where the
+repository is checked out. Verified by rebuilding a copy of the tree at a different path with
+a different `CARGO_HOME` and comparing (identical bytes); CI repeats this under a different
+`CARGO_HOME` (`wasm-frozen-other-cargo-home`). Formatting shifts panic line numbers baked into
+the WASM, so run `cargo fmt` before building; CI checks both.
 
 ## Layout and commands
 
