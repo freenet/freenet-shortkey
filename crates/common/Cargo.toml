@@ -9,6 +9,7 @@ description = "Types, derivation, encoding, verification and merge for the Freen
 blake3.workspace = true
 ed25519-dalek.workspace = true
 bs58.workspace = true
+curve25519-dalek.workspace = true
 
 [dev-dependencies]
 ed25519-dalek = { workspace = true, features = ["rand_core"] }

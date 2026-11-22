@@ -4,6 +4,7 @@
 //! short id; its state holds the full Ed25519 verifying key `vk` and, optionally, owner-signed
 //! versioned application data. See the repository README for the protocol.
 
+use curve25519_dalek::edwards::CompressedEdwardsY;
 use ed25519_dalek::{Signature, SigningKey, VerifyingKey};
 use std::cmp::Ordering;
 use std::fmt;
@@ -29,7 +30,7 @@ pub enum Error {
     BadHandle(String),
     /// Bytes could not be parsed.
     Malformed(&'static str),
-    /// The key is not a valid, non-weak Ed25519 point.
+    /// The key is not a canonically encoded, torsion-free, non-identity Ed25519 point.
     BadKey,
     /// `BLAKE3(DOMAIN || vk)[..16]` does not equal the short id.
     BindingMismatch,
@@ -46,7 +47,10 @@ impl fmt::Display for Error {
         match self {
             Error::BadHandle(s) => write!(f, "bad handle: {s}"),
             Error::Malformed(s) => write!(f, "malformed encoding: {s}"),
-            Error::BadKey => write!(f, "invalid or weak Ed25519 public key"),
+            Error::BadKey => write!(
+                f,
+                "invalid Ed25519 public key (non-canonical, small-order or mixed-order)"
+            ),
             Error::BindingMismatch => write!(f, "key does not hash to the short id"),
             Error::DataTooLarge(n) => write!(f, "data of {n} bytes exceeds {MAX_DATA_LEN}"),
             Error::BadSignature => write!(f, "data signature does not verify"),
@@ -56,6 +60,22 @@ impl fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+/// Check that `vk` is an acceptable owner key: the canonical encoding of a point in the
+/// prime-order subgroup that is not the identity. This rejects non-canonical encodings (y >= p,
+/// or a set sign bit on x = 0), small-order points and mixed-order points `A + T`, so each
+/// real key has exactly one accepted 32-byte form and hence exactly one handle.
+pub fn validate_key(vk: &[u8; KEY_LEN]) -> Result<VerifyingKey, Error> {
+    let point = CompressedEdwardsY(*vk).decompress().ok_or(Error::BadKey)?;
+    if point.compress().to_bytes() != *vk || point.is_small_order() || !point.is_torsion_free() {
+        return Err(Error::BadKey);
+    }
+    let key = VerifyingKey::from_bytes(vk).map_err(|_| Error::BadKey)?;
+    if key.is_weak() {
+        return Err(Error::BadKey);
+    }
+    Ok(key)
+}
 
 /// A 128-bit short id derived from an Ed25519 verifying key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -130,7 +150,9 @@ pub fn parse_locator(s: &str) -> Result<Locator, Error> {
             }
             Ok(Locator::Full(k))
         }
-        n => Err(Error::BadHandle(format!("decodes to {n} bytes, expected 16 or 32"))),
+        n => Err(Error::BadHandle(format!(
+            "decodes to {n} bytes, expected 16 or 32"
+        ))),
     }
 }
 
@@ -146,7 +168,9 @@ pub struct SignedData {
 }
 
 impl SignedData {
-    fn message(short_id: &ShortId, revision: u64, format: u16, data: &[u8]) -> Vec<u8> {
+    /// The exact bytes the owner signs:
+    /// `SIGN_DOMAIN || short_id || revision:u64 BE || format:u16 BE || len:u32 BE || data`.
+    pub fn message(short_id: &ShortId, revision: u64, format: u16, data: &[u8]) -> Vec<u8> {
         let mut m = Vec::with_capacity(SIGN_DOMAIN.len() + SHORT_ID_LEN + 14 + data.len());
         m.extend_from_slice(SIGN_DOMAIN);
         m.extend_from_slice(&short_id.0);
@@ -170,7 +194,12 @@ impl SignedData {
         }
         let id = ShortId::derive(key.verifying_key().as_bytes());
         let sig = key.sign(&Self::message(&id, revision, format, &data));
-        Ok(SignedData { revision, format, data, signature: sig.to_bytes() })
+        Ok(SignedData {
+            revision,
+            format,
+            data,
+            signature: sig.to_bytes(),
+        })
     }
 
     fn verify(&self, vk: &VerifyingKey, id: &ShortId) -> Result<(), Error> {
@@ -178,8 +207,11 @@ impl SignedData {
             return Err(Error::DataTooLarge(self.data.len()));
         }
         let sig = Signature::from_bytes(&self.signature);
-        vk.verify_strict(&Self::message(id, self.revision, self.format, &self.data), &sig)
-            .map_err(|_| Error::BadSignature)
+        vk.verify_strict(
+            &Self::message(id, self.revision, self.format, &self.data),
+            &sig,
+        )
+        .map_err(|_| Error::BadSignature)
     }
 
     /// Total order used by merge: the greater value wins. Higher revision wins; at equal
@@ -246,7 +278,12 @@ impl ResolverState {
                 }
                 let data = r.take(len)?.to_vec();
                 let signature = r.array::<SIG_LEN>()?;
-                Some(SignedData { revision, format, data, signature })
+                Some(SignedData {
+                    revision,
+                    format,
+                    data,
+                    signature,
+                })
             }
             _ => return Err(Error::Malformed("bad data flag")),
         };
@@ -259,10 +296,7 @@ impl ResolverState {
     /// Check the key binding to `id`, the key's validity, the size limit and, if present,
     /// the data signature. The minimal mapping needs no signature.
     pub fn verify(&self, id: &ShortId) -> Result<(), Error> {
-        let vk = VerifyingKey::from_bytes(&self.vk).map_err(|_| Error::BadKey)?;
-        if vk.is_weak() {
-            return Err(Error::BadKey);
-        }
+        let vk = validate_key(&self.vk)?;
         if ShortId::derive(&self.vk) != *id {
             return Err(Error::BindingMismatch);
         }
@@ -292,7 +326,10 @@ impl ResolverState {
 
     pub fn summary(&self) -> Summary {
         Summary {
-            head: self.signed.as_ref().map(|s| (s.revision, *blake3::hash(&s.signature).as_bytes())),
+            head: self
+                .signed
+                .as_ref()
+                .map(|s| (s.revision, *blake3::hash(&s.signature).as_bytes())),
         }
     }
 
@@ -351,6 +388,9 @@ impl Summary {
         Ok(Summary { head })
     }
 }
+
+#[cfg(test)]
+mod tests;
 
 struct Reader<'a>(&'a [u8]);
 

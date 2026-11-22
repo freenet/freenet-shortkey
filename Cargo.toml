@@ -11,6 +11,7 @@ license = "Apache-2.0 OR MIT"
 blake3 = { version = "1.5.3", default-features = false }
 ed25519-dalek = { version = "2.1.1", default-features = false, features = ["alloc"] }
 bs58 = "0.5.1"
+curve25519-dalek = { version = "4", default-features = false }
 freenet-stdlib = { version = "0.12.1", features = ["contract"] }
 freenet-shortkey-common = { path = "crates/common" }
 
