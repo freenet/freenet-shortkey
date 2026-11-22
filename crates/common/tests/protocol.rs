@@ -26,18 +26,16 @@ fn merged(a: &ResolverState, b: &ResolverState) -> ResolverState {
 #[test]
 fn derivation_vectors() {
     let cases: [([u8; 32], &str, &str); 3] = [
-        ([0u8; 32], "", ""),
-        ([1u8; 32], "", ""),
-        ([0xffu8; 32], "", ""),
+        ([0u8; 32], "65602aff592963c36beeaa812aa12b83", "DX4ZCXQ4NZgiw1Cuh8YjuC"),
+        ([1u8; 32], "8c35f5bdd1081c19e80c6e1e3af9817d", "JKCi2BXwJLh46QKm3Sf46p"),
+        ([0xffu8; 32], "562bd5927a6025d29a6f5cdd4eaefc17", "BeAcviiYQKaBSC15JkK1TL"),
     ];
     for (k, hex, b58) in cases {
         let id = ShortId::derive(&k);
         let got_hex: String = id.0.iter().map(|b| format!("{b:02x}")).collect();
         println!("VECTOR {:02x}.. {} {}", k[0], got_hex, id.to_base58());
-        if !hex.is_empty() {
-            assert_eq!(got_hex, hex);
-            assert_eq!(id.to_base58(), b58);
-        }
+        assert_eq!(got_hex, hex);
+        assert_eq!(id.to_base58(), b58);
     }
 }
 
